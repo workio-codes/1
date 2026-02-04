@@ -30,7 +30,7 @@ services:
 
   frontend:
     build:
-      context: ./python/frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: react_frontend
     restart: always
