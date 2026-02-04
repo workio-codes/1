@@ -1,18 +1,16 @@
-FROM node:18-alpine
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY package.json package-lock.json* ./
 RUN npm install
+COPY . .
 
-RUN chmod +x node_modules/ .bin/vite
-
-COPY frontend/ ./
 RUN npm run build
 
 FROM nginx:alpine
 
-COPY --from=0 /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
