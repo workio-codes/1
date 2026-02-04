@@ -1,4 +1,4 @@
-FROM node:18-alpine AS build
+FROM node:18-bullseye AS build
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ RUN npm install
 
 # Copy remaining files and build
 COPY . .
-RUN npx --yes vite build
+RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
