@@ -3,6 +3,7 @@ FROM node:18-bullseye AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
+RUN npm config set cache /tmp --global
 RUN npm install
 
 # Copy remaining files and build
