@@ -1,0 +1,27 @@
+.App {
+  min-height: 100vh;
+}
+
+.app-header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 20px 0;
+  border: 1px solid #f5c6cb;
+}
