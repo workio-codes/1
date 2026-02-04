@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 
-# Set execute permission on binaries
+# Ensure all binaries in node_modules/.bin have execute permissions
 RUN chmod -R +x node_modules/.bin
 
 COPY . .
