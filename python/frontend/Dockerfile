@@ -3,11 +3,12 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 
-# Ensure all binaries in node_modules/.bin have execute permissions
+# Fix permission issues:
 RUN chmod -R +x node_modules/.bin
 
+# Copy remaining files and build
 COPY . .
-RUN npm run build
+RUN chmod -R +x node_modules/.bin && npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
