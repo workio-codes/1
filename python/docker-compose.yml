@@ -40,7 +40,7 @@ services:
 
   frontend:
     build:
-      context: ./python
+      context: .
       dockerfile: frontend/Dockerfile
     # If your Dockerfile is named "Dockerfile" (default), no need to specify
     # dockerfile: Dockerfile
