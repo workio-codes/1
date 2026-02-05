@@ -1,23 +1,23 @@
-# ---- build stage ----
+# ---- Build stage ----
 FROM node:18-alpine AS build
 WORKDIR /app
 
-# Because build context is the project root (.), copy from frontend/
+# Install deps
 COPY frontend/package*.json ./
 RUN npm ci
 
-# Copy the rest of the frontend source into /app
+# Copy source and build (Vite)
 COPY frontend/ ./
-# Optional: verify files are indeed here (helps debug)
-RUN echo "== Listing /app after COPY ==" && ls -la && \
-    echo "== Show top of index.html ==" && head -n 5 index.html || true
-
-# Build (Vite will look for /app/index.html by default)
 RUN npm run build
 
-# ---- run stage (nginx) ----
+# ---- Serve stage (Nginx with API proxy) ----
 FROM nginx:alpine
+
+# Copy compiled app to Nginx web root
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy our proxy config so /api goes to the backend container
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
