@@ -40,7 +40,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
     # If your Dockerfile is named "Dockerfile" (default), no need to specify
     # dockerfile: Dockerfile
     container_name: react_frontend
