@@ -24,14 +24,12 @@ class DatabaseConnection:
             pool_size: Number of connections in the pool
         """
         try:
-            # Expected to return a dict like:
-            # {"host": "...", "user": "...", "password": "...", "database": "...", "port": 3306}
+            # Expected dict: {"host": "...", "user": "...", "password": "...", "database": "...", "port": 3306}
             config = DatabaseConfig.get_connection_string()
 
-            # Recommended options for stable behavior
             base_conn_kwargs = {
                 **config,
-                "autocommit": True,      # autocommit helps avoid lingering transactions
+                "autocommit": True,        # keep transactions clean
                 "charset": "utf8mb4",
                 "use_pure": True,
                 "raise_on_warnings": True,
@@ -40,7 +38,7 @@ class DatabaseConnection:
             cls._pool = pooling.MySQLConnectionPool(
                 pool_name="employee_pool",
                 pool_size=pool_size,
-                pool_reset_session=True,  # reset session state when connection is returned to pool
+                pool_reset_session=True,   # reset state when returning to pool
                 **base_conn_kwargs,
             )
             print(f"Database connection pool initialized with {pool_size} connections")
@@ -56,38 +54,24 @@ class DatabaseConnection:
 
         Yields:
             MySQL connection object
-
-        Raises:
-            Error: If connection cannot be obtained
         """
         if cls._pool is None:
             cls.initialize_pool()
 
-        connection = None
+        connection = cls._pool.get_connection()
         try:
-            connection = cls._pool.get_connection()
-            # Ensure the connection is alive; reconnect quickly if needed
+            # Ensure the connection is alive; reconnect if needed
             try:
                 connection.ping(reconnect=True, attempts=1, delay=0)
             except Exception:
-                # If ping fails, let subsequent usage raise a clearer error
                 pass
-
             yield connection
-        except Error as e:
-            print(f"Error getting connection from pool: {e}")
-            if connection:
-                try:
-                    connection.rollback()
-                except Exception:
-                    pass
-            raise
         finally:
-            if connection and connection.is_connected():
-                try:
+            try:
+                if connection and connection.is_connected():
                     connection.close()
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
     @classmethod
     def test_connection(cls) -> bool:
@@ -99,11 +83,10 @@ class DatabaseConnection:
         """
         try:
             with cls.get_connection() as conn:
-                # Use buffered cursor or explicitly fetch to consume the result set
+                # Use buffered cursor or fetch to consume result set
                 cursor = conn.cursor(buffered=True)
                 try:
                     cursor.execute("SELECT 1")
-                    # Consume the result so no unread results are left
                     row = cursor.fetchone()
                     return bool(row and row[0] == 1)
                 finally:
@@ -132,15 +115,11 @@ class DatabaseConnection:
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
 
-        try:
-            with cls.get_connection() as conn:
-                cursor = conn.cursor()
-                try:
-                    cursor.execute(create_table_query)
-                    conn.commit()
-                finally:
-                    cursor.close()
+        with cls.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(create_table_query)
+                conn.commit()
                 print("Employee table created or already exists")
-        except Error as e:
-            print(f"Error creating table: {e}")
-            raise
+            finally:
+                cursor.close()
