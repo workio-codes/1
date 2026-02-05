@@ -1,0 +1,21 @@
+# VCS & env
+.git
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+.venv/
+venv/
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Docker
+Dockerfile
+docker-compose.override.yml
