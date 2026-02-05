@@ -10,13 +10,12 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # Do NOT include MYSQL_USER / MYSQL_PASSWORD when using root
     ports:
       - "3306:3306"   # optional; remove in prod if not needed externally
     volumes:
       - mysql_data:/var/lib/mysql
-      # Initialize schema on first run only
+      # Initializes schema on first run only (when datadir is empty)
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p${MYSQL_ROOT_PASSWORD} --silent"]
@@ -32,24 +31,36 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      # If your app supports a single DATABASE_URL, this provides it.
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
     depends_on:
       mysql:
         condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      # Ensure your FastAPI has GET /health -> 200
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    # If your Dockerfile is named "Dockerfile" (default), no need to specify
-    # dockerfile: Dockerfile
+      # Vite needs API URL at build time
+      args:
+        - VITE_API_URL=${VITE_API_URL}
     container_name: react_frontend
     restart: always
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     ports:
       - "3000:80"
+    # Note: Vite doesn't read runtime env; it's baked during build via ARG above
     environment:
       VITE_API_URL: ${VITE_API_URL}
 
