@@ -2,85 +2,116 @@
 MySQL database connection management.
 """
 
-import mysql.connector
-from mysql.connector import pooling, Error
 from typing import Optional
 from contextlib import contextmanager
+from mysql.connector import pooling, Error  # type: ignore
+import mysql.connector  # type: ignore
+
 from backend.config import DatabaseConfig
 
 
 class DatabaseConnection:
     """Manages MySQL database connections using connection pooling."""
-    
+
     _pool: Optional[pooling.MySQLConnectionPool] = None
-    
+
     @classmethod
     def initialize_pool(cls, pool_size: int = 5):
         """
         Initialize the connection pool.
-        
+
         Args:
             pool_size: Number of connections in the pool
         """
         try:
+            # Expected to return a dict like:
+            # {"host": "...", "user": "...", "password": "...", "database": "...", "port": 3306}
             config = DatabaseConfig.get_connection_string()
+
+            # Recommended options for stable behavior
+            base_conn_kwargs = {
+                **config,
+                "autocommit": True,      # autocommit helps avoid lingering transactions
+                "charset": "utf8mb4",
+                "use_pure": True,
+                "raise_on_warnings": True,
+            }
+
             cls._pool = pooling.MySQLConnectionPool(
                 pool_name="employee_pool",
                 pool_size=pool_size,
-                pool_reset_session=True,
-                **config
+                pool_reset_session=True,  # reset session state when connection is returned to pool
+                **base_conn_kwargs,
             )
             print(f"Database connection pool initialized with {pool_size} connections")
         except Error as e:
             print(f"Error creating connection pool: {e}")
             raise
-    
+
     @classmethod
     @contextmanager
     def get_connection(cls):
         """
         Get a database connection from the pool.
-        
+
         Yields:
             MySQL connection object
-            
+
         Raises:
             Error: If connection cannot be obtained
         """
         if cls._pool is None:
             cls.initialize_pool()
-        
+
         connection = None
         try:
             connection = cls._pool.get_connection()
+            # Ensure the connection is alive; reconnect quickly if needed
+            try:
+                connection.ping(reconnect=True, attempts=1, delay=0)
+            except Exception:
+                # If ping fails, let subsequent usage raise a clearer error
+                pass
+
             yield connection
         except Error as e:
             print(f"Error getting connection from pool: {e}")
             if connection:
-                connection.rollback()
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
             raise
         finally:
             if connection and connection.is_connected():
-                connection.close()
-    
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+
     @classmethod
     def test_connection(cls) -> bool:
         """
         Test database connection.
-        
+
         Returns:
             True if connection is successful, False otherwise
         """
         try:
             with cls.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                cursor.close()
-                return True
+                # Use buffered cursor or explicitly fetch to consume the result set
+                cursor = conn.cursor(buffered=True)
+                try:
+                    cursor.execute("SELECT 1")
+                    # Consume the result so no unread results are left
+                    row = cursor.fetchone()
+                    return bool(row and row[0] == 1)
+                finally:
+                    cursor.close()
         except Error as e:
             print(f"Connection test failed: {e}")
             return False
-    
+
     @classmethod
     def create_tables(cls):
         """
@@ -98,15 +129,17 @@ class DatabaseConnection:
             hire_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
-        
+
         try:
             with cls.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(create_table_query)
-                conn.commit()
-                cursor.close()
+                try:
+                    cursor.execute(create_table_query)
+                    conn.commit()
+                finally:
+                    cursor.close()
                 print("Employee table created or already exists")
         except Error as e:
             print(f"Error creating table: {e}")
